@@ -32,6 +32,55 @@
 #include <iomanip>
 #include <unordered_map>
 #include <fstream>
+#include <functional>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <limits.h>
+#else
+#include <unistd.h>
+#include <limits.h>
+#endif
+
+/**
+ * @brief Каталог, в котором находится исполняемый файл (с завершающим разделителем).
+ *
+ * Нужен, чтобы ресурсы (шрифты, иконка) загружались независимо от текущей
+ * рабочей папки: при запуске solver из build/ проводником CWD — это build/,
+ * а не корень проекта.
+ */
+inline std::string executableDirectory() {
+#ifdef _WIN32
+    char buffer[MAX_PATH];
+    DWORD length = GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+    if (length > 0 && length < MAX_PATH) {
+        std::string path(buffer, length);
+        const size_t pos = path.find_last_of("\\/");
+        if (pos != std::string::npos) return path.substr(0, pos + 1);
+    }
+#else
+    char buffer[PATH_MAX];
+    const ssize_t length = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+    if (length > 0) {
+        buffer[length] = '\0';
+        std::string path(buffer);
+        const size_t pos = path.find_last_of('/');
+        if (pos != std::string::npos) return path.substr(0, pos + 1);
+    }
+#endif
+    return "";
+}
+
+/**
+ * @brief Проверить, существует ли файл по пути (без реального открытия).
+ */
+inline bool fileExists(const std::string& path) {
+    std::ifstream file(path, std::ios::binary);
+    return file.good();
+}
 
 template <typename T>
 inline float dot(sf::Vector2<T> a, sf::Vector2<T> b) {

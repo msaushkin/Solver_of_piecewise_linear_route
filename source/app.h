@@ -158,12 +158,36 @@ App::~App() {
 }
 
 void App::init(float angle) {
-    arialFont.loadFromFile("resources/arial.ttf");
-    consolaFont.loadFromFile("resources/consola.ttf");
+    // Ресурсы ищем сначала рядом с исполняемым файлом, затем относительно
+    // текущей рабочей папки — чтобы запуск из build/ работал одинаково.
+    // Проверяем существование файла до вызова loadFromFile, иначе SFML
+    // выводит в консоль ложное "Failed to load font ..." для отсутствующих путей.
+    const std::string exeDir = executableDirectory();
+
+    auto loadFirstExisting = [&](const std::string& name, const std::function<bool(const std::string&)>& load) {
+        const std::string candidates[] = {
+            exeDir + "resources/" + name,
+            exeDir + name,
+            "resources/" + name,
+            name
+        };
+        for (const std::string& path : candidates) {
+            if (fileExists(path) && load(path)) return true;
+        }
+        return false;
+    };
+    const bool arialLoaded = loadFirstExisting("arial.ttf", [](const std::string& p) { return arialFont.loadFromFile(p); });
+    const bool consolaLoaded = loadFirstExisting("consola.ttf", [](const std::string& p) { return consolaFont.loadFromFile(p); });
+    if (!arialLoaded)   std::cerr << "Warning: arial.ttf not found\n";
+    if (!consolaLoaded) std::cerr << "Warning: consola.ttf not found\n";
 
     window = new sf::RenderWindow(sf::VideoMode(scw, sch), "Solver piecewise linear route", sf::Style::Close);
-    icon.loadFromFile("resources/mai.png");
-    window->setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
+    const bool iconLoaded = loadFirstExisting("mai.png", [this](const std::string& p) { return icon.loadFromFile(p); });
+    if (iconLoaded) {
+        window->setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
+    } else {
+        std::cerr << "Warning: mai.png not found\n";
+    }
     globalClock = new sf::Clock();
     phi_0 = angle;
     maxDifference = 0.f;
@@ -237,11 +261,11 @@ void App::init(float angle) {
     fileNameTextBox   = new TextBox(sf::Vector2f(230, fieldSize.y + 125), sf::Vector2f(200, 30));
     configNameTextBox = new TextBox(sf::Vector2f(450, fieldSize.y + 125), sf::Vector2f(200, 30));
 
-    threadDP = new sf::Thread(calculateOptimalSolutionDP, this);
-    // threadApproxRect = new sf::Thread(calculateOptimalSolutionByApproxWithRect, this);
-    threadApproxRect = new sf::Thread(calculateOptimalSolutionExperiment, this);
-    thread = new sf::Thread(calculateOptimalSolution, this);
-    threadExperiment = new sf::Thread(makeExperiment, this);
+    threadDP = new sf::Thread(&App::calculateOptimalSolutionDP, this);
+    // threadApproxRect = new sf::Thread(&App::calculateOptimalSolutionByApproxWithRect, this);
+    threadApproxRect = new sf::Thread(&App::calculateOptimalSolutionExperiment, this);
+    thread = new sf::Thread(&App::calculateOptimalSolution, this);
+    threadExperiment = new sf::Thread(&App::makeExperiment, this);
 
     if (cellSize <= 4.f) {
         circles[0]->setPosition(sf::Vector2f(32, gridSize.y - 1 - 22) * cellSize + sf::Vector2f(cellSize / 2.f, cellSize / 2.f));
