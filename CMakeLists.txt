@@ -38,13 +38,34 @@ else()
     target_link_libraries(solver PRIVATE ${SFML_LIBRARIES})
 endif()
 
-# Копируем шрифты рядом с исполняемым файлом при сборке.
-# Шрифты могут лежать в source/ или resources/.
+# SFML 2.5 статическая сборка на Linux связывается только с libOpenGL.
+# На современных дистрибутивах (glvnd: Ubuntu 22.04+) функции GLX лежат в отдельной libGLX.
+# --as-needed по умолчанию в Ubuntu отбрасывает libGLX, если она идёт до статического
+# архива SFML, поэтому отключаем его для этого таргета.
+if(UNIX)
+    find_package(OpenGL QUIET)
+    if(TARGET OpenGL::GLX)
+        target_link_libraries(solver PRIVATE OpenGL::GLX)
+    else()
+        find_library(GLX_LIBRARY NAMES GLX)
+        if(GLX_LIBRARY)
+            target_link_libraries(solver PRIVATE ${GLX_LIBRARY})
+        endif()
+    endif()
+    set_property(TARGET solver APPEND_STRING PROPERTY LINK_FLAGS " -Wl,--no-as-needed")
+endif()
+
+# Копируем шрифты и иконку рядом с исполняемым файлом при сборке.
+# Ресурсы могут лежать в source/ или resources/.
 file(GLOB FONTS
     "${CMAKE_SOURCE_DIR}/source/*.ttf"
     "${CMAKE_SOURCE_DIR}/resources/*.ttf")
-if(FONTS)
+file(GLOB ICONS
+    "${CMAKE_SOURCE_DIR}/resources/*.png"
+    "${CMAKE_SOURCE_DIR}/resources/*.ico")
+set(RESOURCES ${FONTS} ${ICONS})
+if(RESOURCES)
     add_custom_command(TARGET solver POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FONTS} $<TARGET_FILE_DIR:solver>
-        COMMENT "Copying fonts next to solver")
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RESOURCES} $<TARGET_FILE_DIR:solver>
+        COMMENT "Copying resources next to solver")
 endif()

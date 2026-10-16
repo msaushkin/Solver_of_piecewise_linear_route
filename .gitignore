@@ -1,14 +1,21 @@
 # Сборка
 build/
+build-*/
 cmake-build-*/
+out/
 *.o
 *.obj
+*.res
 *.a
 *.lib
 *.exe
 *.dll
+*.so
 *.dSYM/
 *.log
+*.zip
+*.tar.gz
+*.tar.xz
 
 # Ресурсы (шрифты, изображения) — положить локально
 *.otf
