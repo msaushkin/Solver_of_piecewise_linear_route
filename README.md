@@ -10,6 +10,9 @@
 перебор с ограничением области, метод ограниченных прямоугольников, метод
 углов и динамическое программирование.
 
+> **Подробное руководство по интерфейсу** (кнопки, слайдеры, поля, примеры)
+> — в файле [USAGE.md](USAGE.md).
+
 ## Постановка задачи
 
 Даны две точки на плоскости, допустимое число промежуточных поворотов n
@@ -49,96 +52,113 @@
 
 | Зависимость | Версия | Назначение |
 |---|---|---|
-| C++ компилятор (MinGW-w64 / MSVC / Clang) | C++17 | сборка проекта |
-| CMake | >= 3.10 | сборка проекта |
-| SFML | 2.5.x | графический интерфейс (Graphics, Window, System) |
-| Шрифты (в `resources/`) | Arial, Consola | `arial.ttf`, `consola.ttf` рядом с exe |
+| C++ компилятор (g++ / MinGW-w64 / Clang) | C++17, g++ >= 12 | сборка проекта и SFML |
+| CMake | >= 3.16 | сборка проекта и SFML |
+| SFML | 2.5.1 | собирается **из исходников** скриптами setup (Graphics, Window, System) |
+| Шрифты (в `resources/`) | Arial, Consola | `arial.ttf`, `consola.ttf` копируются рядом с исполняемым файлом |
 
-SFML 2.5 нужно установить заранее. Способы:
-
-- **Windows:** бинарная сборка с [sfml-dev.org](https://www.sfml-dev.org/download/sfml/2.5.1/)
-  под ваш компилятор (например, `SFML-2.5.1-windows-gcc-7.3.0-mingw-64-bit.zip`),
-  или сборка из исходников. Обязательно выбирайте версию, собранную **тем же
-  компилятором/ABI**, что и ваш проект (иначе при запуске будет
-  `0xC0000139` / `STATUS_ENTRYPOINT_NOT_FOUND`).
-- **Linux:** `sudo apt install libsfml-dev` (или `brew install sfml`).
-- **macOS:** `brew install sfml`.
-
-При использовании **статической** сборки SFML добавьте
-`-DSFML_STATIC_LIBRARIES=TRUE`; при **динамической (DLL)** — рядом с
-исполняемым файлом должны лежать `sfml-graphics-2.dll`, `sfml-window-2.dll`,
-`sfml-system-2.dll` (и `openal32.dll` при использовании Audio).
+Проект **не зависит** от предкомпилированных библиотек SFML: при первом
+запуске скрипт `setup` скачивает исходники SFML 2.5.1 и собирает их
+статически тем же компилятором, которым собирается проект. Поэтому
+несовместимость ABI (например, `0xC0000139` / `STATUS_ENTRYPOINT_NOT_FOUND`
+при подмешивании DLL от другого компилятора) исключена. Достаточно
+интернета **один раз** — при выполнении `setup`.
 
 ## Структура проекта
 
 ```
 solver/                      # корень проекта
-├── CMakeLists.txt          # сборка проекта
+├── CMakeLists.txt          # сборка проекта и подключение собранного SFML
+├── setup-windows.bat       # Windows: скачать исходники SFML и собрать библиотеки (1 раз)
+├── setup-linux.sh          # Linux: скачать исходники SFML и собрать библиотеки (1 раз)
+├── compile-windows.bat     # Windows: сборка solver (после setup)
+├── compile-linux.sh        # Linux: сборка solver (после setup)
 ├── README.md               # инструкция по сборке/запуску
+├── USAGE.md                # руководство пользователя: интерфейс и примеры
 ├── .gitignore
 ├── source/
 │   ├── main.cpp            # точка входа
 │   ├── app.h               # класс App: окно, поле, алгоритмы
 │   ├── tools.h             # геометрические функции и виджеты UI
 │   └── my.rc               # файл настройки для windres
-└── resources/
-    ├── arial.ttf           # шрифт интерфейса (копируется рядом с exe)
-    ├── consola.ttf         # моноширинный шрифт интерфейса
-    ├── mai.ico             # иконка приложения
-    └── mai.png             # изображение иконки для отображения в трее windows
+├── resources/
+│   ├── arial.ttf           # шрифт интерфейса (копируется рядом с solver)
+│   ├── consola.ttf         # моноширинный шрифт интерфейса
+│   ├── mai.ico             # иконка приложения
+│   └── mai.png             # изображение иконки для отображения в трее windows
+├── maps/                   # тестовые карты (изображения)
+└── test.cfg                # пример сохранённой конфигурации (поле + параметры)
 ```
+
+Каталог `build/` создаётся скриптами и в репозиторий не включается:
+в нём лежат скачанные исходники SFML, собранные статические библиотеки
+и готовый `solver` (шрифты и иконка копируются рядом с ним при сборке).
 
 ## Сборка
 
-### 1. Установите зависимости
+Сборка состоит из двух шагов:
 
-- **SFML 2.5** (см. раздел «Требования»): скачайте/соберите версию под ваш
-  компилятор и распакуйте. Запишите путь до папки с `include/` и `lib/`
-  (для Windows) или путь к `SFMLConfig.cmake`.
-- **Компилятор**: MinGW-w64 (например, через WinLibs), MSVC или Clang.
-- **CMake** >= 3.10.
+1. **`setup`** — один раз после клонирования: скачивает исходники SFML 2.5.1
+   и собирает статические библиотеки текущим компилятором (требуется интернет);
+2. **`compile`** — собирает само приложение. Собранные библиотеки
+   переиспользуются, поэтому `compile` можно запускать многократно.
 
-### 2. Настройте и соберите
+Исполняемый файл называется `solver` (**на Windows — `solver.exe`**).
+Расширение в командах и CMake намеренно не фиксируется — проект
+собирается одинаково на Windows и Linux.
 
-```bash
-# Linux / macOS (SFML из apt/brew)
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+### Windows (MinGW-w64)
 
-# Windows + MinGW (статическая сборка SFML: -DSFML_STATIC_LIBRARIES=TRUE)
-cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release \
-      -DSFML_DIR=/path/to/SFML/lib/cmake/SFML -DSFML_STATIC_LIBRARIES=TRUE
-cmake --build build -j
-
-# Windows + Visual Studio
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release
+```bat
+setup-windows.bat    :: один раз; скачивает SFML и собирает библиотеки
+compile-windows.bat    :: сборка solver.exe
+build\solver.exe     :: запуск
 ```
 
-> Если SFML установлен в нестандартном месте, передайте
-> `-DSFML_DIR=/путь/к/SFML/lib/cmake/SFML` (Windows) или
-> `-DSFML_ROOT=/путь/к/SFML` (Linux/macOS).
->
-> Проект собран с SFML 2.5. В **SFML 3** API изменился
+Требуется: `cmake`, `g++` (MinGW-w64, GCC >= 12) в PATH.
+
+### Linux (g++)
+
+```bash
+chmod +x setup-linux.sh compile-linux.sh   # если нужно
+./setup-linux.sh                     # один раз; скачивает SFML и собирает библиотеки
+./compile-linux.sh                   # сборка solver
+./build/solver                       # запуск
+```
+
+Требуется: `g++` >= 12, `cmake` >= 3.16, `make`, `curl`/`wget`, `unzip`
+(пакеты Ubuntu/Debian: `sudo apt install build-essential cmake unzip curl`).
+
+Для сборки SFML на Linux также нужны заголовки/библиотеки X11, udev, FreeType и OpenGL/GLX:
+```bash
+sudo apt install libx11-dev libxrandr-dev libxinerama-dev \
+                 libxcursor-dev libxi-dev libxext-dev \
+                 libudev-dev libfreetype6-dev libgl1-mesa-dev
+```
+(в новых Ubuntu/Debian пакет FreeType называется `libfreetype-dev` — `apt` сам подставит нужный.)
+
+### Вручную через CMake (эквивалент скриптов)
+
+```bash
+# 1. подготовка SFML (один раз)
+cmake -S build/deps/SFML-2.5.1 -B build/deps/SFML-2.5.1-build \
+      -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+      -DSFML_BUILD_AUDIO=OFF -DSFML_BUILD_NETWORK=OFF \
+      -DSFML_BUILD_EXAMPLES=OFF -DSFML_BUILD_DOC=OFF \
+      -DCMAKE_INSTALL_PREFIX=build/deps/SFML-2.5.1-install
+cmake --build build/deps/SFML-2.5.1-build --target install -j
+
+# 2. сборка solver
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+      -DSFML_DIR="$(pwd)/build/deps/SFML-2.5.1-install/lib/cmake/SFML" \
+      -DSFML_STATIC_LIBRARIES=TRUE
+cmake --build build -j
+```
+
+> Проект рассчитан на **SFML 2.5**. В **SFML 3** API изменился
 > (например, `sf::Text::getLocalBounds`, сигнатуры `loadFromFile`).
-> Без адаптации кода сборка с SFML 3 не сработает.
-
-### 3. Запустите
-
-После сборки исполняемый файл будет в `build/` (или `build/Release/` на Windows
-с генератором Visual Studio). CMake автоматически скопирует шрифты из
-`resources/` рядом с exe — отдельно их класть не нужно, если сборка через CMake.
-
-```bash
-./build/solver
-# или Windows (MinGW Makefiles)
-.\build\solver.exe
-# или Windows (Visual Studio)
-.\build\Release\solver.exe
-```
-
-При **динамической** сборке SFML убедитесь, что DLL SFML лежат рядом с exe
-(или в PATH).
+> Без адаптации кода сборка с SFML 3 не сработает — скрипты всегда
+> ставят 2.5.1.
 
 ## Использование
 
@@ -162,8 +182,9 @@ cmake --build build --config Release
 
 - Проект рассчитан на **SFML 2.5** — переход на SFML 3 потребует
   адаптации кода (см. предупреждение в разделе «Сборка»).
-- Ресурсы (`arial.ttf`, `consola.ttf`) лежат в `resources/`; при сборке через
-  CMake они копируются рядом с исполняемым файлом автоматически.
+- Ресурсы (`arial.ttf`, `consola.ttf`, `mai.png`) лежат в `resources/`;
+  при сборке через CMake они копируются рядом с исполняемым файлом
+  автоматически, а программа ищет их сначала рядом с exe.
 - Иконка окна: программа при запуске пытается загрузить `mai.png`
   (`app.h` → `App::init()`).
 - Алгоритмы поиска выполнены в виде отдельных методов класса `App`.
